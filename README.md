@@ -1,8 +1,9 @@
-YIFFHASHER
+# YIFFHASHER
 ---------------------
-### Autonimous backup management script
+## Autonimous backup management script
 # PowerShell script for backup management
 By: loopyd / fur_user
+
 Oogled at by:  yucked  ;3
 
 ---
