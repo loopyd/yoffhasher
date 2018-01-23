@@ -204,12 +204,9 @@ Function Hash-Directory(
   Write-Host "      clockspeed of your RAM, and how many entries need to be searched.`n" -ForegroundColor Magenta;
   Write-Host -NoNewLine "-- Initializing... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
   
-  $f_count = 0;
+  <# Allocate memory for the lists #>
   $hashTable = New-Object System.Collections.Generic.List[System.Object];
   $duplicateHashFiles = New-Object System.Collections.Generic.List[System.Object];
-  $duplicateTableSize = 0;
-  $hashTableSize = 0;
-  $h_passNum = 1;
  
   <# 1st pass, populate everything... #>
   Get-ChildItem "$($HashDirectory)\*" -Include $FileTypeFilter | Foreach-Object {
@@ -221,77 +218,68 @@ Function Hash-Directory(
 	$hashObject | Add-Member -Name 'Hash' -MemberType Noteproperty -Value $f_hashed;
 	$hashObject | Add-Member -Name 'FullPath' -MemberType Noteproperty -Value $f_name;
 	$hashTable.Add($hashObject);
-	$hashTableSize++;
 	Write-Host -NoNewline "`r-- Processing Hashtable:  " -ForegroundColor White
 	Write-Host -NoNewline "U: N/`A" -ForegroundColor Cyan;
 	Write-Host -NoNewLine " `| " -ForegroundColor White
 	Write-Host -NoNewline "D: N`/A" -ForegroundColor Red;
     Write-Host -NoNewLine " `| " -ForegroundColor White
-    Write-Host -NoNewline $("F: {0}" -f $f_count.ToString()) -ForegroundColor Yellow;
+    Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count).ToString()) -ForegroundColor Yellow;
 	Write-Host -NoNewLine " `| " -ForegroundColor White
 	Write-Host -NoNewLine "Phase: 1 (Population Phase)" -ForegroundColor Green
 	Write-Host -NoNewline "                      " -ForegroundColor Yellow
-	$f_count++;
   }
   
   <# Sort the hashtable #>
   $hashTableTemp = New-Object System.Collections.Generic.List[System.Object];
-  [System.Collections.Generic.List[System.Object]]$hashTableTemp = $($hashTable | Sort-Object Hash -Descending);
+  [System.Collections.Generic.List[System.Object]]$hashTableTemp = $($hashTable | Sort-Object -Property Hash );
   [System.Collections.Generic.List[System.Object]]$hashTable = $hashTableTemp;
   
   <# Second Pass, Recursively go for duplicate hashes #>
   $currentItem = 0;
   $maxItems = ($hashTable.Count);
-  $f_count = 0;
-  while ($currentItem -Le $maxItems) {
+  while ($currentItem -Lt $maxItems) {
+  
+    <# Due to ascending sort order - this always works #>
+	<# It only "always worked" after 6 hours of debugging, thats lyfe #>
     $dupResult = New-Object System.Collections.Generic.List[System.Object];
-	[System.Collections.Generic.List[System.Object]]$dupResult = $($hashTable | Where-Object { $hashTable[$currentItem].Hash -Eq $_.Hash });
-	If (($dupResult.Count) -Gt 1) {
-	   $currentDuplicate = 1;
-	   $maxDuplicates = ($dupResult.Count);
-	   while ($currentDuplicate -Lt $maxDuplicates) {
-	       	$duplicateHashFiles.Add($dupResult[$currentDuplicate]);
-			$hashTable.Remove($dupResult[$currentDuplicate]) | out-null;
-			$duplicateTableSize += 1;
-			$hashTableSize -= 1;
-			$maxItems -= 1;
-			$currentItem -= 1;
-			$currentDuplicate += 1;
+    $dupFound = $True;
+	$ci = 1;
+	do {
+	   If ($hashTable[$currentItem].Hash -Eq $hashTable[$currentItem+$ci].Hash) {
+		    $duplicateHashFiles.Add($HashTable[$currentItem+$ci]);
+			$hashTable.RemoveAt($currentItem+$ci) | out-null;
+			$maxItems--;
+		    $ci++;
+       } Else {
+            $dupFound = $False;
+       }
+	   if (($currentItem+$ci) -Ge ($maxItems)) { $dupFound = $False; }
+	} until (!$dupFound)
+	$currentItem++;
 
-		    Write-Host -NoNewline "`r-- Processing Hashtable:  " -ForegroundColor White
-	        Write-Host -NoNewline $("U: {0}" -f $hashTableSize.ToString()) -ForegroundColor Cyan;
-	        Write-Host -NoNewLine " `| " -ForegroundColor White
-	        Write-Host -NoNewline $("D: {0}" -f $duplicateTableSize.ToString()) -ForegroundColor Red;
-            Write-Host -NoNewLine " `| " -ForegroundColor White
-            Write-Host -NoNewline $("I: {0}" -f $f_count.ToString()) -ForegroundColor Yellow;
-	        Write-Host -NoNewLine " `| " -ForegroundColor White
-	        Write-Host -NoNewLine "Phase: 2 (Adjustment Phase)" -ForegroundColor Green
-		    Write-Host -NoNewline "                   " -ForegroundColor Yellow
-	   }
-	}
     Write-Host -NoNewline "`r-- Processing Hashtable:  " -ForegroundColor White;
-	Write-Host -NoNewline $("U: {0}" -f $hashTableSize.ToString()) -ForegroundColor Cyan;
+	Write-Host -NoNewline $("U: {0}" -f ($hashTable.Count).ToString()) -ForegroundColor Cyan;
 	Write-Host -NoNewLine " `| " -ForegroundColor White;
-	Write-Host -NoNewline $("D: {0}" -f $duplicateTableSize.ToString()) -ForegroundColor Red;
+	Write-Host -NoNewline $("D: {0}" -f ($duplicateHashFiles.Count).ToString()) -ForegroundColor Red;
     Write-Host -NoNewLine " `| " -ForegroundColor White;
-    Write-Host -NoNewline $("F: {0}" -f $f_count.ToString()) -ForegroundColor Yellow;
+    Write-Host -NoNewline $("F: {0}" -f ($currentItem).ToString()) -ForegroundColor Yellow;
 	Write-Host -NoNewLine " `| " -ForegroundColor White;
 	Write-Host -NoNewLine "Phase: 2 (Adjustment Phase)" -ForegroundColor Green;
 	Write-Host -NoNewline "                   " -ForegroundColor Yellow;
-	$currentItem += 1;
-	$f_count += 1;
   }
 
   <# Delete the duplicate files #>
-  Write-Host "`n`n`r-- Deleting duplicate files" -ForegroundColor White;
-  $f_count = 0;
-  while ($f_count -Lt ($duplicateHashFiles.Count)) {
-    $f_name = (Split-Path -Path $duplicateHashFiles[$f_count].FullPath -Leaf).Split(".")[0];
-    $f_ext = (Split-Path -Path $duplicateHashFiles[$f_count].FullPath -Leaf).Split(".")[1];
-	$f_fname = $("{0}{1}" -f $f_name, $f_ext);
-    Write-Host -NoNewline $("`r---- Cleaning duplicate:  {0} | `#{1}" -f $f_fname, $f_count.ToString("#,###,###,###")) -ForegroundColor Cyan	
-	Remove-Item -Path $duplicateHashFiles[$f_count].FullPath -Force;
-	$f_count++;
+  if (($duplicateHashFiles.Count) -Gt 0) {
+    Write-Host "`n`n`r-- Deleting duplicate files" -ForegroundColor White;
+    $f_count = 0;
+    while ($f_count -Lt ($duplicateHashFiles.Count)) {
+        $f_name = (Split-Path -Path $duplicateHashFiles[$f_count].FullPath -Leaf).Split(".")[0];
+        $f_ext = (Split-Path -Path $duplicateHashFiles[$f_count].FullPath -Leaf).Split(".")[1];
+	    $f_fname = $("{0}.{1}" -f $f_name, $f_ext);
+        Write-Host -NoNewline $("`r---- Cleaning duplicate:  {0} | `#{1}" -f $f_fname, ($f_count+1).ToString("#,###,###,###")) -ForegroundColor Cyan	
+	    Remove-Item -Path $duplicateHashFiles[$f_count].FullPath -Force;
+	    $f_count++;
+      }
   }
   
   <# Rename the files uniquely to avoid filename colissions #>
@@ -303,7 +291,7 @@ Function Hash-Directory(
     $f_ext = (Split-Path -Path $hashTable[$f_count].FullPath -Leaf).Split(".")[1];
     $f_oldname = $("{0}.{1}" -f $f_name, $f_ext);
 	$f_newname = $("{0}.{1}" -f $f_count.ToString("##########"), $f_ext);
-	Write-Host -NoNewline $("`r---- Working on file:  {0} | `#{1}          " -f $f_oldname, $f_count.ToString("#,###,###,###")) -ForegroundColor Cyan
+	Write-Host -NoNewline $("`r---- Working on file:  {0} | `#{1}          " -f $f_oldname, ($f_count+1).ToString("#,###,###,###")) -ForegroundColor Cyan
 	Rename-Item -LiteralPath $("{0}\{1}" -f $HashDirectory, $f_oldname) -NewName $f_newname
     $f_count++;
   }  
@@ -317,7 +305,7 @@ Function Hash-Directory(
     $f_ext = (Split-Path -Path $hashTable[$f_count].FullPath -Leaf).Split(".")[1];
 	$f_oldname = $("{0}.{1}" -f $f_name, $f_ext);
 	$f_newname = $("{0}.{1}" -f $hashTable[$f_count].Hash, $f_ext);
-	Write-Host -NoNewline $("`r---- Working on file:  {0} | `#{2}          " -f $f_oldname, $f_count.ToString("#,###,###,###")) -ForegroundColor Cyan
+	Write-Host -NoNewline $("`r---- Working on file:  {0} | `#{1}          " -f $f_oldname, ($f_count+1).ToString("#,###,###,###")) -ForegroundColor Cyan
 	Rename-Item -LiteralPath $("{0}\{1}" -f $HashDirectory, $f_oldname) -NewName $f_newname
     $f_count++;
   }
@@ -563,9 +551,9 @@ $DirectoryPath = $(Get-Location);
 
 <# Testbench #>
 # Flatten-Directory -FlattenRootDirectory "E:\lupin\Pictures\sorted\hashed"
-Reset-Directory -ResetDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
-Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
-Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp -ClusterSize 100
+# Reset-Directory -ResetDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
+Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed_debug" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
+# Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp -ClusterSize 100
 # Reset-Directory -ResetDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob
 # Hash-Directory -HashDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob
 # Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob -ClusterSize 10
