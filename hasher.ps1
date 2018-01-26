@@ -160,7 +160,7 @@ Function Display-Intro()
 Clear-Host
 SetConsoleColor "Black" "White"
 [console]::CursorVisible=$false
-[console]::Title="YIFFHASHER 1.1.2";
+[console]::Title="YOFFHASHER 1.1.2";
 Write-Host "                                     "
 Write-Host "                .-'''''-.            "
 Write-Host "              .'         ``.          "
@@ -168,11 +168,11 @@ Write-Host "             :             :         "
 Write-Host "            :               :        "
 Write-Host "            :      _/|      :        "
 Write-Host "             :   =/_/      :         "
-Write-Host "              ``._/ |     .'         YIFFHASHER "
+Write-Host "              ``._/ |     .'         YOFFHASHER "
 Write-Host "           (   /  ,|...-'            by fur_user"
-Write-Host "            \_/^\/||__               "
-Write-Host "         _/~  ```"`"~```"` \_         Am an M$ faggot      "
-Write-Host "      __/  -'/  ``-._ ``\_\__           js   "
+Write-Host "           `|\_/^\/||_               "
+Write-Host "         _/~  ```"`"~```"` \_         version:"
+Write-Host "      __/  -'/  ``-._ ``\_\__           0.9.0-testing"
 Write-Host "    /     /-'``  ``\   \  \-.\         `n"
 }
 
@@ -190,125 +190,102 @@ Function Hash-Directory(
 	[String] $HashDirectory, 
 	[string[]]$FileTypeFilter)
 {
-  Write-Host " --- Hashing directory ---`n" -ForegroundColor Yellow;
-  Write-Host "-- Welcome to THE YIFFERHASHER.  Leave your hat at the door.  This takes a while!  Here's an explanation" -ForegroundColor Cyan;
-  Write-Host "   of whats happening:`n" -ForegroundColor Cyan;
-  Write-Host "   Phase 1 (Population Phase)" -ForegroundColor Green;
-  Write-Host "      Your directory will be non-destructively MD5 hashed.  The performance impact here is dependent on" -ForegroundColor Magenta;
-  Write-Host "      how large each file is, how many you've to scan, and of course the speed of your storage media." -ForegroundColor Magenta;
-  Write-Host "   Phase 2 (Adjustment Phase)" -ForegroundColor Green;
-  Write-Host "      The table in memory will be removed of duplicates and stored into a different table for deletion." -ForegroundColor Magenta;
-  Write-Host "      You will NOT experience heavy disk activity during this time.  It is highly recomended on a large" -ForegroundColor Magenta;
-  Write-Host "      dataset, that you hold at least 8 GB of RAM in your system.  Performance impact in this phase is" -ForegroundColor Magenta;
-  Write-Host "      dependant on wether or not you have enough RAM to remain in RAM and not on your pagefile, the" -ForegroundColor Magenta;
-  Write-Host "      clockspeed of your RAM, and how many entries need to be searched.`n" -ForegroundColor Magenta;
-  Write-Host -NoNewLine "-- Initializing... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
-  
-  <# Allocate memory for the lists #>
-  $hashTable = New-Object System.Collections.Generic.List[System.Object];
-  $duplicateHashFiles = New-Object System.Collections.Generic.List[System.Object];
+  Write-Host "----- Hashing directory -----`n" -ForegroundColor Yellow;
  
-  <# 1st pass, populate everything... #>
+  <# 1st pass, populate everything... #> 
+  Write-Host "-- Indexing files --`n" -ForegroundColor Cyan
+  $hashTable = New-Object System.Collections.Generic.List[System.Object];
+  Write-Host -NoNewLine "`r-- Processing" -ForegroundColor White;
+  Write-Host -NoNewLine " `| " -ForegroundColor White;
+  Write-Host -NoNewLine "(Hashing...)          " -ForegroundColor Green;
   Get-ChildItem "$($HashDirectory)\*" -Include $FileTypeFilter | Foreach-Object {
-	$f_path = $_.Path;
-    $f_name = $_.FullName;
-	$f_ext = $_.Extension;
-	$f_hashed = $("{0}" -f $(Get-FileHash -LiteralPath $f_name -Algorithm MD5).Hash );
     $hashObject = New-Object -TypeName PSObject;
-	$hashObject | Add-Member -Name 'Hash' -MemberType Noteproperty -Value $f_hashed;
-	$hashObject | Add-Member -Name 'FullPath' -MemberType Noteproperty -Value $f_name;
+	$FObject = $_;
+	$hashObject | Add-Member -Name 'Hash' -MemberType Noteproperty -Value (Get-FileHash -LiteralPath $FObject.FullName -Algorithm MD5).Hash;
+	$hashObject | Add-Member -Name 'FullPath' -MemberType Noteproperty -Value $FObject.FullName;
 	$hashTable.Add($hashObject);
-	Write-Host -NoNewline "`r-- Processing Hashtable:  " -ForegroundColor White
-	Write-Host -NoNewline "U: N/`A" -ForegroundColor Cyan;
-	Write-Host -NoNewLine " `| " -ForegroundColor White
-	Write-Host -NoNewline "D: N`/A" -ForegroundColor Red;
-    Write-Host -NoNewLine " `| " -ForegroundColor White
-    Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count).ToString()) -ForegroundColor Yellow;
-	Write-Host -NoNewLine " `| " -ForegroundColor White
-	Write-Host -NoNewLine "Phase: 1 (Population Phase)" -ForegroundColor Green
-	Write-Host -NoNewline "                      " -ForegroundColor Yellow
+	If ((($hashTable.Count) % 32768) -eq 0) {
+		Write-Host -NoNewline "`r-- Processing `| " -ForegroundColor White;
+        Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
+		Write-Host -NoNewLine " `| " -ForegroundColor White;
+        Write-Host -NoNewLine "(Wow, you have a lot, this will take some time...)     " -ForegroundColor Green;
+	}
+  }
+  Write-Host -NoNewline "`r-- Processing `| " -ForegroundColor White;
+  Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
+  Write-Host -NoNewLine " `| " -ForegroundColor White;
+  Write-Host -NoNewLine "(Operation Completed)                               " -ForegroundColor Green;
+ 
+  <# Group Objects, Select groups greater than 1, and equal to 1. #>
+  Write-Host "`n`n`n-- Grouping items --" -ForegroundColor Cyan;
+  Write-Host "`n-- Finding duplicate files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
+  $hashGroupDuplicate = $hashTable | Group -Property Hash | Where { $_.Count -gt 1 }
+  Write-Host $("-- Found {0} duplicates`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
+  Write-Host "-- Finding unique files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
+  $hashGroupUnique = $hashTable | Group -Property Hash | Where { $_.Count -eq 1 }
+  Write-Host $("-- Found {0} unique files`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
+  
+  $DuplicateFiles = ($hashGroupDuplicate.Count);
+  $UniqueFiles = ($hashGroupUnique.Count);
+  $RemovedFiles = 0;
+  
+  <# Delete Duplicates #>
+  Write-Host "`n-- Performing cleanup --`n" -ForegroundColor Cyan
+  Foreach ($Group in $hashGroupDuplicate) {
+	$Group.group | Select Hash,FullPath -Skip 1 | %{
+	  Write-Host -NoNewline "`r-- " -ForegroundColor White;
+	  Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
+	  Write-Host -NoNewLine " `| " -ForegroundColor White;
+	  Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
+      Write-Host -NoNewLine " `| " -ForegroundColor White;
+      Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count).ToString()) -ForegroundColor Yellow;
+	  Write-Host -NoNewLine " `| " -ForegroundColor White;
+	  Write-Host -NoNewLine "Phase: 2 (Deletion Phase)" -ForegroundColor Green;
+	  Write-Host -NoNewline "                              " -ForegroundColor Yellow;
+	  del $_.FullPath;
+	  $RemovedFiles++;
+	}
   }
   
-  <# Sort the hashtable #>
-  $hashTableTemp = New-Object System.Collections.Generic.List[System.Object];
-  [System.Collections.Generic.List[System.Object]]$hashTableTemp = $($hashTable | Sort-Object -Property Hash );
-  [System.Collections.Generic.List[System.Object]]$hashTable = $hashTableTemp;
-  
-  <# Second Pass, Recursively go for duplicate hashes #>
-  $currentItem = 0;
-  $maxItems = ($hashTable.Count);
-  while ($currentItem -Lt $maxItems) {
-  
-    <# Due to ascending sort order - this always works #>
-	<# It only "always worked" after 6 hours of debugging, thats lyfe #>
-    $dupResult = New-Object System.Collections.Generic.List[System.Object];
-    $dupFound = $True;
-	$ci = 1;
-	do {
-	   If ($hashTable[$currentItem].Hash -Eq $hashTable[$currentItem+$ci].Hash) {
-		    $duplicateHashFiles.Add($HashTable[$currentItem+$ci]);
-			$hashTable.RemoveAt($currentItem+$ci) | out-null;
-			$maxItems--;
-		    $ci++;
-       } Else {
-            $dupFound = $False;
-       }
-	   if (($currentItem+$ci) -Ge ($maxItems)) { $dupFound = $False; }
-	} until (!$dupFound)
-	$currentItem++;
-
-    Write-Host -NoNewline "`r-- Processing Hashtable:  " -ForegroundColor White;
-	Write-Host -NoNewline $("U: {0}" -f ($hashTable.Count).ToString()) -ForegroundColor Cyan;
-	Write-Host -NoNewLine " `| " -ForegroundColor White;
-	Write-Host -NoNewline $("D: {0}" -f ($duplicateHashFiles.Count).ToString()) -ForegroundColor Red;
-    Write-Host -NoNewLine " `| " -ForegroundColor White;
-    Write-Host -NoNewline $("F: {0}" -f ($currentItem).ToString()) -ForegroundColor Yellow;
-	Write-Host -NoNewLine " `| " -ForegroundColor White;
-	Write-Host -NoNewLine "Phase: 2 (Adjustment Phase)" -ForegroundColor Green;
-	Write-Host -NoNewline "                   " -ForegroundColor Yellow;
-  }
-
-  <# Delete the duplicate files #>
-  if (($duplicateHashFiles.Count) -Gt 0) {
-    Write-Host "`n`n`r-- Deleting duplicate files" -ForegroundColor White;
-    $f_count = 0;
-    while ($f_count -Lt ($duplicateHashFiles.Count)) {
-        $f_name = (Split-Path -Path $duplicateHashFiles[$f_count].FullPath -Leaf).Split(".")[0];
-        $f_ext = (Split-Path -Path $duplicateHashFiles[$f_count].FullPath -Leaf).Split(".")[1];
-	    $f_fname = $("{0}.{1}" -f $f_name, $f_ext);
-        Write-Host -NoNewline $("`r---- Cleaning duplicate:  {0} | `#{1}" -f $f_fname, ($f_count+1).ToString("#,###,###,###")) -ForegroundColor Cyan	
-	    Remove-Item -Path $duplicateHashFiles[$f_count].FullPath -Force;
-	    $f_count++;
-      }
-  }
-  
-  <# Rename the files uniquely to avoid filename colissions #>
-  Write-Host "`n`n`r-- Renaming files to avoid collisions..." -ForegroundColor White;
-  $f_count = 0;
-  while ($f_count -Lt ($hashTable.Count)) {
-    <# The split in here to different variables is for status output purposes only... #>
-    $f_name = (Split-Path -Path $hashTable[$f_count].FullPath -Leaf).Split(".")[0];
-    $f_ext = (Split-Path -Path $hashTable[$f_count].FullPath -Leaf).Split(".")[1];
-    $f_oldname = $("{0}.{1}" -f $f_name, $f_ext);
-	$f_newname = $("{0}.{1}" -f $f_count.ToString("##########"), $f_ext);
-	Write-Host -NoNewline $("`r---- Working on file:  {0} | `#{1}          " -f $f_oldname, ($f_count+1).ToString("#,###,###,###")) -ForegroundColor Cyan
-	Rename-Item -LiteralPath $("{0}\{1}" -f $HashDirectory, $f_oldname) -NewName $f_newname
-    $f_count++;
+  <# Rename items to unique names #>
+  Write-Host "`n-- Correcting file names --`n" -ForegroundColor Cyan
+  $RenamedFiles = 0;
+  Foreach ($Group in $hashGroupUnique) {
+	$Group.group | Select Hash,FullPath | %{
+	  Write-Host -NoNewline "`r-- " -ForegroundColor White
+	  Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
+	  Write-Host -NoNewLine " `| " -ForegroundColor White
+	  Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
+      Write-Host -NoNewLine " `| " -ForegroundColor White;
+      Write-Host -NoNewline $("R(I): {0}" -f $RenamedFiles.ToString()) -ForegroundColor Yellow;
+	  Write-Host -NoNewLine " `| " -ForegroundColor White
+	  Write-Host -NoNewLine "Phase: 3 (Rename Phase - Pass I)" -ForegroundColor Green
+	  Write-Host -NoNewline "                      " -ForegroundColor Yellow
+	  Rename-Item -LiteralPath $_.FullPath -NewName $("w{0}{1}" -f $RenamedFiles.ToString("#########"), [IO.Path]::GetExtension($_.FullPath));
+	  $RenamedFiles++;
+    }
   }  
   
   <# Rename the uniquely named files #>
-  Write-Host "`n`n`r-- Renaming files to proper hashnames..." -ForegroundColor White;
-  $f_count = 0;
-  while ($f_count -Lt ($hashTable.Count)) {
-    <# The split in here to different variables is for status output purposes only... #>
-    $f_name = $("{0}" -f $f_count.ToString("##########"));
-    $f_ext = (Split-Path -Path $hashTable[$f_count].FullPath -Leaf).Split(".")[1];
-	$f_oldname = $("{0}.{1}" -f $f_name, $f_ext);
-	$f_newname = $("{0}.{1}" -f $hashTable[$f_count].Hash, $f_ext);
-	Write-Host -NoNewline $("`r---- Working on file:  {0} | `#{1}          " -f $f_oldname, ($f_count+1).ToString("#,###,###,###")) -ForegroundColor Cyan
-	Rename-Item -LiteralPath $("{0}\{1}" -f $HashDirectory, $f_oldname) -NewName $f_newname
-    $f_count++;
-  }
+  $RenamedFiles = 0;
+  Foreach ($Group in $hashGroupUnique) {
+	$Group.group | Select Hash,FullPath | %{
+	  Write-Host -NoNewline "`r-- " -ForegroundColor White
+	  Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
+	  Write-Host -NoNewLine " `| " -ForegroundColor White
+	  Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
+      Write-Host -NoNewLine " `| " -ForegroundColor White;
+      Write-Host -NoNewline $("R(II): {0}" -f $RenamedFiles.ToString()) -ForegroundColor Yellow;
+	  Write-Host -NoNewLine " `| " -ForegroundColor White
+	  Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count).ToString()) -ForegroundColor Yellow;
+	  Write-Host -NoNewLine " `| " -ForegroundColor White;
+	  Write-Host -NoNewLine "Phase: 3 (Rename Phase - Pass II)" -ForegroundColor Green
+	  Write-Host -NoNewline "                      " -ForegroundColor Yellow
+	  Rename-Item -LiteralPath $("{0}\w{1}{2}" -f $HashDirectory, $RenamedFiles.ToString("#########"), [IO.Path]::GetExtension($_.FullPath)) -NewName $("{0}{1}" -f $_.Hash, [IO.Path]::GetExtension($_.FullPath));
+	  $RenamedFiles++;
+    }
+  }  
+
   Write-Host "`n`r"
   
   Write-Host "----- Operation Completed -----`n" -ForegroundColor Green
@@ -552,7 +529,7 @@ $DirectoryPath = $(Get-Location);
 <# Testbench #>
 # Flatten-Directory -FlattenRootDirectory "E:\lupin\Pictures\sorted\hashed"
 # Reset-Directory -ResetDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
-Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed_debug" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
+Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
 # Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp -ClusterSize 100
 # Reset-Directory -ResetDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob
 # Hash-Directory -HashDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob
