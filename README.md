@@ -25,8 +25,22 @@ alone and forgotten about.  (please, no - animal abuse is not okay).
 
 ---
 
-### Configuration
-Explanations of argument options
+### Configuration and Usage
+
+YOFFHASHER uses a segmented backup system.
+Each segment is refered to as a ``chainlink``.
+
+You link each function together to design your ``backup chain``.
+
+Some functions, like ``Flatten-Directory`` and ``Generate-FolderClusters``, should be placed correctly at the beginning and the end of your ``backup chain`` respectively, to put the backup media in a state where it can be worked on in a flat manner.
+Functions like ``Migrate-All`` bring new data into your backup dataset.  They should also be ran on a flattened tree, and contain special features that save hard-drive space while preserving the original ``incoming`` folder tree, to optimize data mergers.
+
+It is recommended you design your backup cluster directory structure as follows:
+
+``incoming`` - Watched by ``Migrate-All`` - Merge data in by "New and Updated files only" from your upload interface, filtered by ``Modification Date``.  Keep the stubs!
+``pictures``, ``videos``, ``documents``, etc. - Could potentially reside on a NAS, or another storage medium.  This is where your clusters will populate.
+
+Options for each ``chainlink`` segment are listed below:
 
 # Flatten-Directory options:
 ```
