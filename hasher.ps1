@@ -160,7 +160,7 @@ Function Display-Intro()
 Clear-Host
 SetConsoleColor "Black" "White"
 [console]::CursorVisible=$false
-[console]::Title="YOFFHASHER 1.1.2";
+[console]::Title="YOFFHASHER 0.9.0-testing";
 Write-Host "                                     "
 Write-Host "                .-'''''-.            "
 Write-Host "              .'         ``.          "
