@@ -1,3 +1,13 @@
+$PSScriptVersion = "0.9.1-testing";
+
+<#
+	Get-StringHash
+	
+	Returns a Hash from an input string of the specified algorithm.
+
+	By: LupineDream
+	Windows Powershell 5.0
+#>
 Function Get-StringHash([String] $String,$HashName = "MD5") 
 { 
 	$StringBuilder = New-Object System.Text.StringBuilder 
@@ -7,19 +17,27 @@ Function Get-StringHash([String] $String,$HashName = "MD5")
 	$StringBuilder.ToString() 
 }
 
+<#
+	SetConsoleColor
+	
+	Sets the Winodws PowerShell console window's background and foreground color.
+
+	By:  LupineDream
+	Windows PowerShell 5.0
+#>
 Function SetConsoleColor ($bc,$fc) {
 	$a = (Get-Host).UI.RawUI
 	$a.BackgroundColor = $bc
 	$a.ForegroundColor = $fc ; cls}
 
 <#
-List-ByLength
+	List-ByLength
 
-Converts a string to a .NET list split by a specified number of characters
-Optimized for speyd (very large strings!)
+	Converts a string to a .NET list split by a specified number of characters
+	Optimized for speyd (very large strings!)
 
-By:  LupineDream
-Original:  http://stackoverflow.com/questions/17171531/powershell-string-to-array/17173367#17173367
+	By:  LupineDream
+	Windows PowerShell 5.0
 #>
 function List-ByLength{
 	[cmdletbinding()]param(
@@ -45,13 +63,13 @@ function List-ByLength{
 }
 
 <#
-Get-Increment
-Part of Lupy's libmath.ps1
+	Get-Increment
+	Part of Lupy's libmath.ps1
 		
-		Gives you a number rounded up to the nearest incrimental value.
+	Gives you a number rounded up to the nearest incrimental value.
 		
-		Windows PowerShell 5.0
-		By:  LupineDream
+	Windows PowerShell 5.0
+	By:  LupineDream
 #>
 Function Get-Increment([single] $value, [int] $increment=1){    
 	if($value -gt 1)
@@ -152,23 +170,26 @@ Function Add-Resource ([String] $FileToEncode, [String] $ResourceFile) {
 
 Function Display-Intro()
 {
-	Clear-Host
-	SetConsoleColor "Black" "White"
-	[console]::CursorVisible=$false
-	[console]::Title="YOFFHASHER 0.9.0-testing";
-	Write-Host "                                     "
-	Write-Host "                .-'''''-.            "
-	Write-Host "              .'         ``.          "
-	Write-Host "             :             :         "
-	Write-Host "            :               :        "
-	Write-Host "            :      _/|      :        "
-	Write-Host "             :   =/_/      :         "
-	Write-Host "              ``._/ |     .'         YOFFHASHER "
-	Write-Host "           (   /  ,|...-'            by fur_user"
-	Write-Host "           `|\_/^\/||_               "
-	Write-Host "         _/~  ```"`"~```"` \_         version:"
-	Write-Host "      __`/  -`'/  ``-._ ``\_`\__           0.9.0-testing"
-	Write-Host "    /     /-`'``  ``\   \  \-.\         `n"
+	Clear-Host;
+	SetConsoleColor "Black" "White";
+	[console]::CursorVisible=$false;
+	[console]::Title=$("YOFFHASHER {0}" -f $PSScriptVersion);
+	Write-Host "                                     " -ForegroundColor White;
+	Write-Host "                .-'''''-.            " -ForegroundColor White;
+	Write-Host "              .'         ``.          " -ForegroundColor White;
+	Write-Host "             :             :         " -ForegroundColor White;
+	Write-Host "            :               :        " -ForegroundColor White;
+	Write-Host "            :      _/|      :        " -ForegroundColor White;
+	Write-Host "             :   =/_/      :         " -ForegroundColor White;
+	Write-Host -NoNewline "              ``._/ |     .'         " -ForegroundColor White;
+	Write-Host "YOFFHASHER" -ForegroundColor Cyan;
+	Write-Host -NoNewline "           (   /  ,|...-'            by: " -ForegroundColor White;
+	Write-Host "fur_user" -ForegroundColor Magenta;
+	Write-Host "           `|\_/^\/||_               " -ForegroundColor White;
+	Write-Host "         _/~  ```"`"~```"` \_         version:" -ForegroundColor White;
+	Write-Host -NoNewLine "      __`/  -`'/  ``-._ ``\_`\__           " -ForegroundColor White;
+	Write-Host $("{0}" -f $PSScriptVersion) -ForegroundColor Yellow;
+	Write-Host "    /     /-`'``  ``\   \  \-.\         `n" -ForegroundColor White
 }
 
 <#
@@ -185,14 +206,15 @@ Function Hash-Directory(
 	[String] $HashDirectory, 
 	[string[]]$FileTypeFilter)
 {
-	Write-Host "----- Hashing directory -----`n" -ForegroundColor Yellow;
+	Write-Host "----- Hashing directory -----`n" -ForegroundColor Cyan;
 
 	<# 1st pass, populate everything... #> 
-	Write-Host "-- Indexing files --`n" -ForegroundColor Cyan
+	Write-Host "`tIndexing files`n" -ForegroundColor Yellow
 	$hashTable = New-Object System.Collections.Generic.List[System.Object];
-	Write-Host -NoNewLine "`r-- Processing" -ForegroundColor White;
+	Write-Host -NoNewLine "`r`t`tProcessing" -ForegroundColor White;
 	Write-Host -NoNewLine " `| " -ForegroundColor White;
 	Write-Host -NoNewLine "(Hashing...)          " -ForegroundColor Green;
+	$ProcessedSize = 0;
 	Get-ChildItem "$($HashDirectory)\*" -Include $FileTypeFilter | Foreach-Object {
 		$hashObject = New-Object -TypeName PSObject;
 		$FObject = $_;
@@ -200,35 +222,42 @@ Function Hash-Directory(
 		$hashObject | Add-Member -Name 'FullPath' -MemberType Noteproperty -Value $FObject.FullName;
 		$hashTable.Add($hashObject);
 		If ((($hashTable.Count) % 32768) -eq 0) {
-			Write-Host -NoNewline "`r-- Processing `| " -ForegroundColor White;
+			Write-Host -NoNewline "`r`t`tProcessing `| " -ForegroundColor White;
 			Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
 			Write-Host -NoNewLine " `| " -ForegroundColor White;
-			Write-Host -NoNewLine "(Wow, you have a lot, this will take some time...)     " -ForegroundColor Green;
+			Write-Host -NoNewLine "(You have a lot of files, this will take some time...)     " -ForegroundColor Green;
 		}
+		If ((($ProcessedSize) % 1GB) -eq 0) {
+			Write-Host -NoNewline "`r`t`tProcessing `| " -ForegroundColor White;
+			Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
+			Write-Host -NoNewLine " `| " -ForegroundColor White;
+			Write-Host -NoNewLine "(Your dataset is very large, this will take some time...)     " -ForegroundColor Green;
+		}
+		$ProcessedSize += $FObject.length;
 	}
-	Write-Host -NoNewline "`r-- Processing `| " -ForegroundColor White;
+	Write-Host -NoNewline "`r`t`tProcessing `| " -ForegroundColor White;
 	Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
 	Write-Host -NoNewLine " `| " -ForegroundColor White;
 	Write-Host -NoNewLine "(Operation Completed)                               " -ForegroundColor Green;
 
 	<# Group Objects, Select groups greater than 1, and equal to 1. #>
-	Write-Host "`n`n`n-- Grouping items --" -ForegroundColor Cyan;
-	Write-Host "`n-- Finding duplicate files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
+	Write-Host "`n`n`n`tGrouping items" -ForegroundColor Yellow;
+	Write-Host "`n`t`tFinding duplicate files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
 	$hashGroupDuplicate = $hashTable | Group -Property Hash | Where { $_.Count -gt 1 }
-	Write-Host $("-- Found {0} duplicates`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
-	Write-Host "-- Finding unique files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
+	Write-Host $("`t`t`tFound {0} duplicates`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
+	Write-Host "`t`tFinding unique files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
 	$hashGroupUnique = $hashTable | Group -Property Hash | Where { $_.Count -eq 1 }
-	Write-Host $("-- Found {0} unique files`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
+	Write-Host $("`t`t`tFound {0} unique files`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
 
 	$DuplicateFiles = ($hashGroupDuplicate.Count);
 	$UniqueFiles = ($hashGroupUnique.Count);
 	$RemovedFiles = 0;
 
 	<# Delete Duplicates #>
-	Write-Host "`n-- Performing cleanup --`n" -ForegroundColor Cyan
+	Write-Host "`n`tPerforming cleanup`n" -ForegroundColor Yellow
 	ForEach ($Group in $hashGroupDuplicate) {
 		$Group.group | Select Hash,FullPath -Skip 1 | %{
-			Write-Host -NoNewline "`r-- " -ForegroundColor White;
+			Write-Host -NoNewline "`r`t" -ForegroundColor White;
 			Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
 			Write-Host -NoNewLine " `| " -ForegroundColor White;
 			Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
@@ -240,7 +269,10 @@ Function Hash-Directory(
 			del $_.FullPath;
 			$RemovedFiles++;
 		}
-	}	
+	}
+	If ($RemovedFiles -Eq 0) {
+		Write-Host "`tNo duplicates detected, nothing done" -ForegroundColor Red;
+	}
 
 	<# Rename items to unique names #>
 	Write-Host "`n-- Correcting file names --`n" -ForegroundColor Cyan
@@ -248,7 +280,7 @@ Function Hash-Directory(
 	ForEach ($Group in $hashGroupUnique) {
 		$Group.group | Select Hash,FullPath | %{
 			Rename-Item -LiteralPath $_.FullPath -NewName $("w{0}{1}" -f $RenamedFiles.ToString("#########"), [IO.Path]::GetExtension($_.FullPath));
-			Write-Host -NoNewline "`r-- " -ForegroundColor White
+			Write-Host -NoNewline "`r`t" -ForegroundColor White
 			Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
 			Write-Host -NoNewLine " `| " -ForegroundColor White
 			Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
@@ -266,7 +298,7 @@ Function Hash-Directory(
 	ForEach ($Group in $hashGroupUnique) {
 		$Group.group | Select Hash,FullPath | %{
 			Rename-Item -LiteralPath $("{0}\w{1}{2}" -f $HashDirectory, $RenamedFiles.ToString("#########"), [IO.Path]::GetExtension($_.FullPath)) -NewName $("{0}{1}" -f $_.Hash, [IO.Path]::GetExtension($_.FullPath));
-			Write-Host -NoNewline "`r-- " -ForegroundColor White
+			Write-Host -NoNewline "`r`t" -ForegroundColor White
 			Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
 			Write-Host -NoNewLine " `| " -ForegroundColor White
 			Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
@@ -280,7 +312,6 @@ Function Hash-Directory(
 			$RenamedFiles++;
 		}
 	}  
-
 	Write-Host "`n`r"
 
 	Write-Host "----- Operation Completed -----`n" -ForegroundColor Green
@@ -303,54 +334,29 @@ Function Reset-Directory(
 		[String] $ResetDirectory, 
 		[string[]]$FileTypeFilter)
 {
-	Write-Host " --- Reseting directory file attributes ---`n" -ForegroundColor Yellow;
-	Write-Host "--- Listing files... (wait, could take a while if your directory contains a lot)";
+	Write-Host " --- Reseting directory file attributes ---`n" -ForegroundColor Cyan;
+	Write-Host "`tListing files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
 	$catalog = Get-ChildItem "$($ResetDirectory)\*" -Include $FileTypeFilter -Force;
-	Write-Host $("`n -- Catalogged {0} files.`n" -f (($catalog).Count).ToString("##,###,###,###"));
+	Write-Host $("`n`tCataloged {0} files.`n" -f (($catalog).Count).ToString("##,###,###,###"));
 
-	<# Act on ReadOnly items FIRST #>
-	$ROcatalog = $catalog | where { $_.Attributes -Match "ReadOnly"}
-	If (($ROcatalog.Count) -gt 0) {
-		Write-Host $(" -- Found {0} Read Only files." -f (($ROcatalog).Count).ToString("##,###,###,###"));
-		$fcount = 1;
-		ForEach ($ROfile in $ROcatalog) {
-			Write-Host -NoNewline $("`r -- Reset {0} Read Only files." -f $fcount.ToString("##,###,###,###")) -ForegroundColor Cyan;
-			$ROfile.Attributes = "Normal"
-			$fcount++;
+	Write-Host "`tResetting File Attributes" -ForegroundColor Yellow;
+	
+	$ToReset = @("ReadOnly", "Hidden", "Archive");
+	
+	ForEach ($ToResetThis in $ToReset) {
+		$ROcatalog = $catalog | where { $_.Attributes -Match $ToResetThis}
+		If (($ROcatalog.Count) -gt 0) {
+			Write-Host $("`t`tFound {0} {1} files." -f (($ROcatalog).Count).ToString("##,###,###,###"),$ToResetThis);
+			$fcount = 1;
+			ForEach ($ROfile in $ROcatalog) {
+				Write-Host -NoNewline $("`r`t`tReset {0} {1} files." -f $fcount.ToString("##,###,###,###"),$ToResetThis) -ForegroundColor Cyan;
+				$ROfile.Attributes = "Normal"
+				$fcount++;
+			}
+			Write-Host -NoNewLine "`n`r";
+		} Else {
+			Write-Host $("`t`tNo {0} files need reset." -f $ToResetThis) -ForegroundColor Red;
 		}
-		Write-Host -NoNewLine "`n`r";
-	} Else {
-		Write-Host "-- No ReadOnly files need resetting." -ForegroundColor Green;
-	}
-
-	<# Act on Hidden items #>
-	$HScatalog = $catalog | where { $_.Attributes -Match "Hidden"}
-	If (($HScatalog.Count) -gt 0) {
-		Write-Host $(" -- Found {0} Hidden files." -f (($HScatalog).Count).ToString("##,###,###,###"));
-		$fcount = 1;
-		Foreach ($HSfile in $HScatalog) {
-			Write-Host -NoNewline $("`r -- Reset {0} Hidden files." -f $fcount.ToString("##,###,###,###")) -ForegroundColor Cyan;
-			$HSfile.Attributes = "Normal"
-			$fcount++;
-		}
-		Write-Host -NoNewLine "`n`r";
-	} Else {
-		Write-Host "-- No Hidden files need resetting." -ForegroundColor Green;
-	}
-
-	<# Act on Archive items (most typical attribute set) #>
-	$ARcatalog = $catalog | where { $_.Attributes -Match "Archive"}
-	If (($ARcatalog.Count) -gt 0) {
-		Write-Host $(" -- Found {0} Archive files." -f (($ARcatalog).Count).ToString("##,###,###,###"));
-		$fcount = 1;
-		Foreach ($ARfile in $ARcatalog) {
-			Write-Host -NoNewline $("`r -- Reset {0} Archive files." -f $fcount.ToString("##,###,###,###")) -ForegroundColor Cyan;
-			$ARfile.Attributes = "Normal"
-			$fcount++;
-		}
-		Write-Host -NoNewLine "`n`r";
-	} Else {
-		Write-Host "-- No Archive files need resetting." -ForegroundColor Green;
 	}
 
 	Write-Host "`n----- Operation Completed -----`n" -ForegroundColor Green;
@@ -372,26 +378,25 @@ Function Flatten-Directory (
 		[Parameter(Position = 0)]
 		[String] $FlattenRootDirectory)
 {
-	Write-Host " --- Flattening Cluster directory ---`n" -ForegroundColor Yellow;
+	Write-Host " --- Flattening Cluster directory ---`n" -ForegroundColor Cyan;
 
 	<# Scan the directory for existing clusters #>
-	Write-Host "-- Attempting to detect current cluster culture" -ForegroundColor Yellow;
-	Write-Host "-- Please wait, this doesn't take too long.";
+	Write-Host "`tAttempting to detect current cluster culture" -ForegroundColor Yellow;
 	$catalogFolders = Get-ChildItem "$($FlattenRootDirectory)\*" -Directory -Force -ErrorAction SilentlyContinue | Where-Object { $_.FullName -Like "$($FlattenRootDirectory)\cluster*" }
 	$numClusters = $catalogFolders.Count;
 
 	If ($numClusters) {
-		Write-Host $("-- Detected {0} existing clusters --" -f $numClusters.ToString("##,###,###,###")) -ForegroundColor Cyan;
+		Write-Host $("`tDetected {0} existing clusters --" -f $numClusters.ToString("##,###,###,###")) -ForegroundColor Cyan;
 
 		<# Scan the directory and subdirectories below for files (this will include entires that are
 		ONLY in a cluster, thus leaving other files unflattened you may have stored in other folders #>
-		Write-Host $("`n-- Scanning files inside clusters" -f $numClusters) -ForegroundColor Yellow;
+		Write-Host "`n`tScanning files inside clusters" -ForegroundColor Yellow;
 		$catalogFiles = Get-ChildItem "$($FlattenRootDirectory)\*" -Recurse -Include *.* -ErrorAction SilentlyContinue | Where-Object { $_.FullName -Like "$($FlattenRootDirectory)\cluster*\*" }
 		$numFiles = $catalogFiles.Count;
 
-		Write-Host $("-- Detected {0} files in {1} clusters --" -f $numFiles.ToString("##,###,###,###"), $numClusters.ToString("##,###,###,###")) -ForegroundColor Cyan;
-		Write-Host $("`n-- Flattening directory tree" -f $numClusters) -ForegroundColor Yellow;
-		Write-Host "-- Please wait, this is an active file-move operation which could take a while.`n";
+		Write-Host $("`n`t`tDetected {0} files in {1} clusters --" -f $numFiles.ToString("##,###,###,###"), $numClusters.ToString("##,###,###,###")) -ForegroundColor Cyan;
+		Write-Host "`n`tFlattening directory tree" -ForegroundColor Yellow;
+		Write-Host "`t`tPlease wait, this is an active file-move operation which could take a while.`n" -ForegroundColor Green;
 
 		<# copy files to root #>
 		$numFilesDone = 1;
@@ -401,29 +406,31 @@ Function Flatten-Directory (
 			$SearchStart=[System.Text.RegularExpressions.Regex]::Escape("$($FlattenRootDirectory)\cluster");
 			$SearchEnd=[System.Text.RegularExpressions.Regex]::Escape("\$($theFile)");
 			If ($theClusterB -match "(?s)$SearchStart(?<content>.*)$SearchEnd") { $theCluster=[int]$matches['content']; }
-			Write-Host -NoNewline $("`r-- Moving file {0} of {1} in cluster {2} to root - {3}       " -f $numFilesDone.ToString("##,###,###,###"), $numFiles.ToString("##,###,###,###"), $theCluster.ToString("##,###,###,###"), $theFile) -ForegroundColor Cyan;
+			Write-Host -NoNewline $("`r`t`tMoving file {0} of {1} in cluster {2} to root - {3}       " -f $numFilesDone.ToString("##,###,###,###"), $numFiles.ToString("##,###,###,###"), $theCluster.ToString("##,###,###,###"), $theFile) -ForegroundColor Cyan;
 			mi $catalogFile.FullName $FlattenRootDirectory;
 			$numFilesDone++;
 		}
 
-	Write-Host -NoNewLine "`n";
+		Write-Host -NoNewLine "`n";
 
-	<# remove empty cluster folders #>
-	$numClust = 1;
-	If ($catalogFolders.Count -gt 0) {
-		ForEach ($currentFolder in $catalogFolders)
-		{
-				$theFolderB = $currentFolder.FullName;
-				$SearchStart=[System.Text.RegularExpressions.Regex]::Escape("$($FlattenRootDirectory)\cluster");
-				if ($theFolderB -match "(?s)$SearchStart(?<content>.*)") { $theCluster=[int]$matches['content']; }
-				Write-Host -NoNewLine $("`r-- Successfully cleaned cluster #{0}       " -f $theCluster.ToString("##,###,###,###")) -ForegroundColor Cyan;
-				Remove-Item -Path $currentFolder.FullName -Force;
-				$numClust++;
+		<# remove empty cluster folders #>
+		$numClust = 1;
+		If ($catalogFolders.Count -gt 0) {
+			
+			Write-Host "`n`tRemoving original cluster folders" -ForegroundColor Yellow;
+			ForEach ($currentFolder in $catalogFolders)
+			{
+					$theFolderB = $currentFolder.FullName;
+					$SearchStart=[System.Text.RegularExpressions.Regex]::Escape("$($FlattenRootDirectory)\cluster");
+					if ($theFolderB -match "(?s)$SearchStart(?<content>.*)") { $theCluster=[int]$matches['content']; }
+					Write-Host -NoNewLine $("`r`tSuccessfully cleaned cluster #{0}       " -f $theCluster.ToString("##,###,###,###")) -ForegroundColor Cyan;
+					Remove-Item -Path $currentFolder.FullName -Force;
+					$numClust++;
+			}
+			Write-Host -NoNewLine "`n`r"
 		}
-		Write-Host -NoNewLine "`n`r"
-	}
 	} Else {
-		Write-Host "-- No Clusters found - cannot flatten non-existant things`!" -ForegroundColor Red;
+		Write-Host "`tNo Clusters found - No operation needed`!" -ForegroundColor Red;
 	}
 
 	Write-Host "`n----- Operation Completed -----`n" -ForegroundColor Green;
@@ -453,10 +460,10 @@ Function Generate-FolderClusters(
 	[int]$ClusterSize)
 {
 
-	Write-Host " --- Generating payload clusters ---`n" -ForegroundColor Yellow;
+	Write-Host "--- Generating Clusters ---`n" -ForegroundColor Cyan;
 
 	<# Search for currently existing cluster folders #>
-	Write-Host "-- Attempting to detect current cluster culture";
+	Write-Host "`tAttempting to detect current cluster culture" -ForegroundColor Yellow;
 	$catalogFolders = Get-ChildItem "$($ClusterRootDirectory)\*" -Directory -Force -ErrorAction SilentlyContinue;
 	$numClusters = 0;
 	If ($(($catalogFolders).Count) -gt 0) {
@@ -468,35 +475,37 @@ Function Generate-FolderClusters(
 				$numClusters++;
 			}
 		}
+		Write-Host $("`t`tDetected {0} existing clusters --`n" -f $numClusters) -ForegroundColor Yellow;
+	} Else {
+		Write-Host $("`t`tNo pre-existing folder clusters found`n" -f $numClusters) -ForegroundColor Red;
 	}
-	Write-Host $("`n-- Detected {0} existing clusters --`n" -f $numClusters) -ForegroundColor Yellow;
-
+	
 	<# Detect how many clusters are needed to be created to complete the operation #>
-	Write-Host "-- Listing files... (wait, could take a while if your directory contains a lot)";
+	Write-Host "`tListing files... (wait, could take a while if your directory contains a lot)";
 	$catalog = Get-ChildItem "$($ClusterRootDirectory)\*" -Include $FileTypeFilter -Force -ErrorAction SilentlyContinue;
 	$numClustersNeeded = Get-Increment $(($catalog).Count / $ClusterSize);
 
 	If ($numClustersNeeded -ne 0)
 	{
-		Write-Host $("`n-- Detected needed {0} clusters --`n" -f $numClustersNeeded) -ForegroundColor Yellow;
+		Write-Host $("`n`tDetected needed {0} clusters --`n" -f $numClustersNeeded) -ForegroundColor Yellow;
 
 		<# Generate the folder structure #>
 		For ($createCluster = $($numClusters + 1); $createCluster -le $($numClustersNeeded + $numClusters); $createCluster++)
 		{
 			$buildpath = $("{0}\cluster{1}" -f $ClusterRootDirectory, $createCluster.ToString());
-			Write-Host -NoNewline $("`r-- Creating Cluster Directory `#{0} - {1}" -f $createCluster.ToString("##,###,###,###"), $buildpath) -ForegroundColor Cyan;
+			Write-Host -NoNewline $("`r`t`tCreating Cluster Directory `#{0} - {1}" -f $createCluster.ToString("##,###,###,###"), $buildpath) -ForegroundColor Cyan;
 			$dummy = New-Item -ItemType directory -Path $buildpath;
 		}
 		Write-Host "`n`r";
 
 		<# Move the files from the root into the newly generated clusters #>
-		Write-Host "-- Begining clustering process --`n" -ForegroundColor Yellow;
+		Write-Host "`tBeginning clustering process`n" -ForegroundColor Yellow;
 		$currentCluster = $($numClusters + 1);
 		$currentFile = 1;
 		ForEach ($WorkFile in $catalog)
 		{
 			$buildpath = $("{0}\cluster{1}" -f $ClusterRootDirectory, $currentCluster.ToString());
-			Write-Host -NoNewline $("`r-- Working on Cluster {0} at index {1} / Clusters remaining: {2}" -f $currentCluster.ToString("##,###,###,###"), $currentFile.ToString(), $($($numClusters + $numClustersNeeded) - $currentCluster).ToString("##,###,###,###")) -ForegroundColor Cyan;
+			Write-Host -NoNewline $("`r`t`tWorking on Cluster {0} at index {1} / Clusters remaining: {2}" -f $currentCluster.ToString("##,###,###,###"), $currentFile.ToString(), $($($numClusters + $numClustersNeeded) - $currentCluster).ToString("##,###,###,###")) -ForegroundColor Cyan;
 			mi $WorkFile.FullName $buildpath;
 			$currentFile++;
 			If ($currentFile -gt $ClusterSize) {
@@ -505,8 +514,9 @@ Function Generate-FolderClusters(
 			}
 		}
 	} Else {
-		Write-Host "-- No update operation is required" -ForegroundColor Red;
+		Write-Host "`tNo update operation is required" -ForegroundColor Red;
 	}
+	Write-Host "`n----- Operation Completed -----`n" -ForegroundColor Green;
 }
 
 <#
@@ -573,11 +583,11 @@ Function Migrate-All(
 	[bool]$StubOriginals = $False)
 {
 	If ((Test-Path -LiteralPath $MigrateRootDirectory)) {
-		Write-Host " --- Migrating files ---`n" -ForegroundColor Yellow;
+		Write-Host " --- Migrating files ---`n" -ForegroundColor Cyan;
 		If ($StubOriginals -Eq $True) {
-			Write-Host "-- Keeping file stubs during operation`n" -ForegroundColor Green;
+			Write-Host "`tKeeping file stubs during operation" -ForegroundColor Green;
 		} Else {
-			Write-Host "-- Moving files only during operation`n" -ForegroundColor Yellow;
+			Write-Host "`tMoving files only during operation" -ForegroundColor Yellow;
 		}
 		$NumMigrated = 0;
 		Get-ChildItem "$($MigrateRootDirectory)\" -Include $FileTypeFilter -Recurse | Foreach-Object {
@@ -600,12 +610,17 @@ Function Migrate-All(
 					mi $TheFile.FullName $nextName;
 				}
 			
-				Write-Host -NoNewLine "-- Migrating file: " -ForegroundColor White;
+				Write-Host -NoNewLine "`tMigrating file: " -ForegroundColor White;
 				Write-Host $("{0}" -f [System.IO.Path]::GetFileName($nextName)) -ForegroundColor Cyan;
 				$NumMigrated++;
 			}
 		}
+		If ($NumMigrated -Eq 0) {
+			Write-Host "`tNothing new - No migration operation is required" -ForegroundColor Red;
+		}
 		Write-Host "`n----- Operation Completed -----`n" -ForegroundColor Green;
+	} Else {
+		Write-Host "`tFATAL:  Migration source directory does not exist" -ForegroundColor Red;
 	}
 }
 
