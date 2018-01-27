@@ -62,6 +62,28 @@ Explanations of argument options
      (50-100) for larger directories, or (25-50) for smaller directories.
 ```
 
+# Migrate-All options:
+```
+-MigrateRootDirectory [string]
+     The path which contains files that need migrated.
+-FileTypeFilter [string,string,...]
+     Glob expressions filtering files by extension (or potentially name!)  Add as many as you'd like.
+-DestinationDirectory [string]
+     The path to place the migrated files (flat).
+-StubOriginals [bool]
+	Wether or not to leave an empty stub behind in the copy operation which retains the original file's
+	creation and modification dates.  Useful to preserve tree structures in the original directory, but
+	save storage space.
+```
+
+# Stub-Move options:
+```
+-FilePath [string]
+     The File to move and create a stub of
+-DestinationDirectory [string]
+     The destination path/filename (usually the same, could be different to avoid duplicates)
+```
+
 # Add-Resource options:
 ```
   CURRENTLY IN TESTING STATE, DON'T USE THIS JUST YET.  IT'S A JSON RESOURCE PACKER I HAVEN'T
