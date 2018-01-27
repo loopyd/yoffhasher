@@ -523,16 +523,128 @@ Function Generate-FolderClusters(
   }
 }
 
+<#
+
+	Stub-Move
+
+	Copies a file, leaving an empty stub behind that holds the same creation/modification timestamps.
+	
+	This function is designed to preserve an original directory tree while saving HDD space.
+	The stub assumes the exact same properties as the original file, without its contents.
+	  
+	Windows PowerShell 5.0
+	By:  LupineDream
+	
+#>
+Function Stub-Move (
+    [Parameter(Position = 0)]
+    [string]$FilePath,
+	[string]$DestinationDirectory)
+{
+	<# Store info on the original file #>
+	$File = ( Get-Item -LiteralPath $FilePath );
+	$FileName = $File.Name;
+	$FileFullName = $File.FullName;
+	$FileCreateDate = $File.CreationTime;
+	$FileLastModify = $File.LastWriteTime;
+	$FileLastAccess = $File.LastAccessTime;
+	$FileNewFullName = $DestinationDirectory;
+		
+	<# Copy the file from the old location and delete the original, replacing it with an empty file #>
+	Copy-Item -LiteralPath $FileFullName -Destination $DestinationDirectory;
+	Remove-Item -LiteralPath $FileFullName;
+	New-Item $FileFullName -ItemType file | Out-Null;
+		
+	<# Update the stub's timestamps to match the old. #>
+	(Get-Item -LiteralPath $FileFullName).LastWriteTime=($FileLastModify);
+	(Get-Item -LiteralPath $FileFullName).CreationTime=($FileCreateDate);
+	(Get-Item -LiteralPath $FileFullName).LastAccessTime=($FileLastAccess);
+		
+	<# Preserve the moved file's timestamps #>
+	(Get-Item -LiteralPath $FileNewFullName).LastWriteTime=($FileLastModify);
+	(Get-Item -LiteralPath $FileNewFullName).CreationTime=($FileCreateDate);
+	(Get-Item -LiteralPath $FileNewFullName).LastAccessTime=($FileLastAccess);
+}
+
+<#
+
+	Migrate-All
+
+	Migrate a directory recursively to a flat directory tree for preperation for merger into
+	the dataset.
+	
+	Duplicate filenames are renamed atuomatically.
+	
+	Pass in -StubOriginals True to stub the original file while preserving its creation/modification
+	dates instead of directly moving it.
+	
+#>
+Function Migrate-All(
+    [Parameter(Position = 0)]
+    [string]$MigrateRootDirectory,
+	[string]$DestinationDirectory,
+    [string[]]$FileTypeFilter,
+	[bool]$StubOriginals = $False)
+{
+	If ((Test-Path -LiteralPath $MigrateRootDirectory)) {
+		Write-Host " --- Migrating files ---`n" -ForegroundColor Yellow;
+		if ($StubOriginals -Eq $True) {
+			Write-Host "-- Keeping file stubs during operation`n" -ForegroundColor Green;
+		} Else {
+			Write-Host "-- Moving files only during operation`n" -ForegroundColor Yellow;
+		}
+		$NumMigrated = 0;
+		Get-ChildItem "$($MigrateRootDirectory)\" -Include $FileTypeFilter -Recurse | Foreach-Object {
+			
+			$TheFile = $_;
+			If ((Get-Item -LiteralPath $TheFile.FullName).length -gt 1Kb) {
+				<# Determine a new filename that doesn't collide with one at the destination #>
+				$nextName = Join-Path -Path $DestinationDirectory -ChildPath $TheFile.Name
+				$num=1;
+				while(Test-Path -LiteralPath $nextName)
+				{
+					$nextName = Join-Path $DestinationDirectory ($TheFile.BaseName + "_$num" + $TheFile.Extension);
+					$num+=1;   
+				}
+
+				<# Move the file #>
+				if ($StubOriginals -Eq $True) {
+					Stub-Move -FilePath $TheFile.FullName -DestinationDirectory $nextName; 
+				} Else {
+					mi $TheFile.FullName $nextName;
+				}
+			
+				Write-Host -NoNewLine "-- Migrating file: " -ForegroundColor White;
+				Write-Host $("{0}" -f [System.IO.Path]::GetFileName($nextName)) -ForegroundColor Cyan;
+				$NumMigrated++;
+			}
+		}
+	}
+}
+
+#>
+
 Display-Intro
 $DirectoryPath = $(Get-Location);
 
 <# Testbench #>
 # Flatten-Directory -FlattenRootDirectory "E:\lupin\Pictures\sorted\hashed"
 # Reset-Directory -ResetDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
-Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
+# Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
 # Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp -ClusterSize 100
+# Flatten-Directory -FlattenRootDirectory "E:\lupin\Videos\nice stuff"
 # Reset-Directory -ResetDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob
 # Hash-Directory -HashDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob
 # Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob -ClusterSize 10
-#Add-Resource "$($DirectoryPath)\test.txt" "$($DirectoryPath)\test.rsrc"
-#Add-Resource "$($DirectoryPath)\test2.txt" "$($DirectoryPath)\test.rsrc"
+# Add-Resource "$($DirectoryPath)\test.txt" "$($DirectoryPath)\test.rsrc"
+# Add-Resource "$($DirectoryPath)\test2.txt" "$($DirectoryPath)\test.rsrc"
+
+# Stub-Move Function test
+# Stub-Move -FilePath "$($DirectoryPath)\test.txt" -DestinationDirectory "$($DirectoryPath)\stub_debug"
+
+# Picture migration test chain
+# Flatten-Directory -FlattenRootDirectory "E:\lupin\Pictures\sorted\hashed"
+Migrate-All -MigrateRootDirectory "E:\lupin\Videos\nice stuff proofed" -DestinationDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp -StubOriginals $True;
+Reset-Directory -ResetDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
+Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
+# Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp -ClusterSize 100
