@@ -18,6 +18,25 @@ Function Get-StringHash([String] $String,$HashName = "MD5")
 }
 
 <#
+	Display-FromBytes
+	
+	Return a correctly formatted string representation of a byte number.
+#>
+Function Display-FromBytes($num) 
+{
+    $suffix = "B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB";
+    $index = 0;
+	$num2 = $num;
+    while ($num2 -gt 1024) 
+    {
+        $num2 = $num2 / 1024
+        $index++
+    } 
+
+    "{0:N1} {1}" -f $num2, $suffix[$index]
+}
+
+<#
 	SetConsoleColor
 	
 	Sets the Winodws PowerShell console window's background and foreground color.
@@ -214,50 +233,125 @@ Function Hash-Directory(
 	Write-Host -NoNewLine "`r`t`tProcessing" -ForegroundColor White;
 	Write-Host -NoNewLine " `| " -ForegroundColor White;
 	Write-Host -NoNewLine "(Hashing...)          " -ForegroundColor Green;
-	$ProcessedSize = 0;
+	$recordCount = 0;
+	$recordsSec = 0;
+	$sT = Get-Date;
 	Get-ChildItem "$($HashDirectory)\*" -Include $FileTypeFilter | Foreach-Object {
 		$hashObject = New-Object -TypeName PSObject;
 		$FObject = $_;
 		$hashObject | Add-Member -Name 'Hash' -MemberType Noteproperty -Value (Get-FileHash -LiteralPath $FObject.FullName -Algorithm MD5).Hash;
 		$hashObject | Add-Member -Name 'FullPath' -MemberType Noteproperty -Value $FObject.FullName;
 		$hashTable.Add($hashObject);
-		If ((($hashTable.Count) % 32768) -eq 0) {
+		If ((($hashTable.Count) % 2048) -eq 0) {
 			Write-Host -NoNewline "`r`t`tProcessing `| " -ForegroundColor White;
-			Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
+			Write-Host -NoNewline $("File: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
 			Write-Host -NoNewLine " `| " -ForegroundColor White;
-			Write-Host -NoNewLine "(You have a lot of files, this will take some time...)     " -ForegroundColor Green;
+			Write-Host -NoNewline $("Records`/sec: {0}" -f $recordsSec.ToString()) -ForegroundColor Blue;
+			Write-Host -NoNewLine "                 " -ForegroundColor White;
 		}
-		If ((($ProcessedSize) % 1GB) -eq 0) {
-			Write-Host -NoNewline "`r`t`tProcessing `| " -ForegroundColor White;
-			Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
-			Write-Host -NoNewLine " `| " -ForegroundColor White;
-			Write-Host -NoNewLine "(Your dataset is very large, this will take some time...)     " -ForegroundColor Green;
+		$recordCount++;
+		
+		<# Update timer #>
+		$cT = Get-Date;
+		If ([system.Math]::Abs(([int]$cT.Second-[int]$sT.Second)) -Gt 1) {
+			$sT = $cT;
+			$recordsSec = $recordCount;
+			$recordCount = 0;
 		}
-		$ProcessedSize += $FObject.length;
 	}
 	Write-Host -NoNewline "`r`t`tProcessing `| " -ForegroundColor White;
-	Write-Host -NoNewline $("F: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
+	Write-Host -NoNewline $("File: {0}" -f ($hashTable.Count)) -ForegroundColor Yellow;
+	Write-Host -NoNewLine " `| " -ForegroundColor White;
+	Write-Host -NoNewline $("Records`/sec: {0}" -f $recordsSec.ToString()) -ForegroundColor Blue;
 	Write-Host -NoNewLine " `| " -ForegroundColor White;
 	Write-Host -NoNewLine "(Operation Completed)                               " -ForegroundColor Green;
 
-	<# Group Objects, Select groups greater than 1, and equal to 1. #>
-	Write-Host "`n`n`n`tGrouping items" -ForegroundColor Yellow;
-	Write-Host "`n`t`tFinding duplicate files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
-	$hashGroupDuplicate = $hashTable | Group -Property Hash | Where { $_.Count -gt 1 }
-	Write-Host $("`t`t`tFound {0} duplicates`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
-	Write-Host "`t`tFinding unique files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
-	$hashGroupUnique = $hashTable | Group -Property Hash | Where { $_.Count -eq 1 }
-	Write-Host $("`t`t`tFound {0} unique files`n" -f ($hashGroupDuplicate.Count)) -ForegroundColor Cyan;
+	<# Define worker ScriptBlocks #>
+	$duplicateScriptBlock = {
+	    param([System.Collections.Generic.List[System.Object]]$hTable) 
+		# Write-Host "`n`t`tFinding duplicate files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
+		$hTableResult = $hTable | Group -Property Hash | Where { $_.Count -gt 1 }
+		$RunResult = New-Object PSObject -Property @{
+			RunIdent = "JobDuplicates"
+			Table = $hTableResult
+		}
+		Return $RunResult;
+	}
+	$uniqueScriptBlock = {
+		param([System.Collections.Generic.List[System.Object]]$hTable)
+		# Write-Host "`t`tFinding unique files... (wait, could take a while if your directory contains a lot)" -ForegroundColor Yellow;
+		$hTableResult = $hTable | Group -Property Hash | Where { $_.Count -eq 1 }
+		$RunResult = New-Object PSObject -Property @{
+			RunIdent = "JobUnique"
+			Table = $hTableResult
+		}
+		Return $RunResult;
+	}
+	
+	<# Register jobs to the runspace pool. #>
+	$RunspacePool = [RunspaceFactory]::CreateRunspacePool(1, 2);
+	$RunspacePool.Open();
+    $JobDuplicates = [powershell]::Create().AddScript($duplicateScriptBlock).AddArgument([System.Collections.Generic.List[System.Object]]$hashTable);
+    $JobDuplicates.RunspacePool = $RunspacePool;
+	$JobUniques = [powershell]::Create().AddScript($uniqueScriptBlock).AddArgument([System.Collections.Generic.List[System.Object]]$hashTable);
+    $JobUniques.RunspacePool = $RunspacePool;
+	
+	<# Invoke parallel jobs #>
+	Write-Host "`n`n`tGrouping items" -ForegroundColor Yellow;
+	$Jobs = @()
+	$Jobs += New-Object PSObject -Property @{
+		RunID = "JobDuplicates"
+		Pipe = $JobDuplicates
+		Result = $JobDuplicates.BeginInvoke()
+    }
+	$Jobs += New-Object PSObject -Property @{
+		RunID = "JobUniques"
+		Pipe = $JobUniques
+		Result = $JobUniques.BeginInvoke()
+	}
+	
+	<# Wait loop #>
+	Write-Host -NoNewLine "`n";
+	$sT = Get-Date;
+	do {
+		Start-Sleep -Seconds 1;
+		$RunningJobs = 0;
+		If ($Jobs[0].Result.IsCompleted -Contains $false) { $RunningJobs++; }
+		If ($Jobs[1].Result.IsCompleted -Contains $false) { $RunningJobs++; }
+		
+		$cT = Get-Date;
+		$eHT = [system.Math]::Abs(([int]$cT.Hour-[int]$sT.Hour));
+		$eMT = [system.Math]::Abs(([int]$cT.Minute-[int]$sT.Minute));
+		$eST = [system.Math]::Abs(([int]$cT.Second-[int]$sT.Second));
+		
+		Write-Host -NoNewLine $("`r`t`t{0} Jobs running" -f $RunningJobs.ToString()) -ForegroundColor Cyan;
+		Write-Host -NoNewLine " `| " -ForegroundColor White;
+		Write-Host -NoNewLine $("Elapsed: {0}h:{1}m:{2}s          " -f $eHT.ToString("0"),$eMT.ToString("00"),$eST.ToString("00")) -ForegroundColor Blue;
+	} While ( $Jobs.Result.IsCompleted -Contains $false)
+   
+	<# Store Results #>
+	$Results = @()
+	ForEach ($Job in $Jobs) {
+		$Results += $Job.Pipe.EndInvoke($Job.Result)
+	}
+	ForEach ($Result in $Results) {
+		If ($Result.RunIdent -Eq "JobDuplicates") {
+			$hashGroupDuplicate = $Result.Table;
+		}
+		If ($Result.RunIdent -Eq "JobUnique") {
+			$hashGroupUnique = $Result.Table;	
+		}
+	}
 
 	$DuplicateFiles = ($hashGroupDuplicate.Count);
 	$UniqueFiles = ($hashGroupUnique.Count);
 	$RemovedFiles = 0;
 
 	<# Delete Duplicates #>
-	Write-Host "`n`tPerforming cleanup`n" -ForegroundColor Yellow
+	Write-Host "`n`n`tPerforming cleanup`n" -ForegroundColor Yellow
 	ForEach ($Group in $hashGroupDuplicate) {
 		$Group.group | Select Hash,FullPath -Skip 1 | %{
-			Write-Host -NoNewline "`r`t" -ForegroundColor White;
+			Write-Host -NoNewline "`r`t`t" -ForegroundColor White;
 			Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
 			Write-Host -NoNewLine " `| " -ForegroundColor White;
 			Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
@@ -271,16 +365,16 @@ Function Hash-Directory(
 		}
 	}
 	If ($RemovedFiles -Eq 0) {
-		Write-Host "`tNo duplicates detected, nothing done" -ForegroundColor Red;
+		Write-Host "`t`tNo duplicates detected, nothing done" -ForegroundColor Red;
 	}
 
 	<# Rename items to unique names #>
-	Write-Host "`n-- Correcting file names --`n" -ForegroundColor Cyan
+	Write-Host "`n`tCorrecting file names`n" -ForegroundColor Yellow
 	$RenamedFiles = 0;
 	ForEach ($Group in $hashGroupUnique) {
 		$Group.group | Select Hash,FullPath | %{
 			Rename-Item -LiteralPath $_.FullPath -NewName $("w{0}{1}" -f $RenamedFiles.ToString("#########"), [IO.Path]::GetExtension($_.FullPath));
-			Write-Host -NoNewline "`r`t" -ForegroundColor White
+			Write-Host -NoNewline "`r`t`t" -ForegroundColor White
 			Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
 			Write-Host -NoNewLine " `| " -ForegroundColor White
 			Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
@@ -298,7 +392,7 @@ Function Hash-Directory(
 	ForEach ($Group in $hashGroupUnique) {
 		$Group.group | Select Hash,FullPath | %{
 			Rename-Item -LiteralPath $("{0}\w{1}{2}" -f $HashDirectory, $RenamedFiles.ToString("#########"), [IO.Path]::GetExtension($_.FullPath)) -NewName $("{0}{1}" -f $_.Hash, [IO.Path]::GetExtension($_.FullPath));
-			Write-Host -NoNewline "`r`t" -ForegroundColor White
+			Write-Host -NoNewline "`r`t`t" -ForegroundColor White
 			Write-Host -NoNewline $("U: {0}" -f $UniqueFiles.ToString()) -ForegroundColor Cyan;
 			Write-Host -NoNewLine " `| " -ForegroundColor White
 			Write-Host -NoNewline $("D: {0}" -f  $RemovedFiles.ToString()) -ForegroundColor Red;
@@ -632,7 +726,7 @@ $DirectoryPath = $(Get-Location);
 <# Testbench #>
 # Flatten-Directory -FlattenRootDirectory "E:\lupin\Pictures\sorted\hashed"
 # Reset-Directory -ResetDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
-# Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
+# Hash-Directory -HashDirectory "E:\lupin\Pictures\sorted\hashed_debug" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp
 # Generate-FolderClusters -ClusterRootDirectory "E:\lupin\Pictures\sorted\hashed" -FileTypeFilter *.gif,*.jpg,*.png,*.jpeg,*.bmp -ClusterSize 100
 # Flatten-Directory -FlattenRootDirectory "E:\lupin\Videos\nice stuff"
 # Reset-Directory -ResetDirectory "E:\lupin\Videos\nice stuff" -FileTypeFilter *.mov,*.avi,*.flv,*.wmv,*.mp4,*.m4v,*.mkv,*.divx,*.rm,*.mpg,*.mpeg,*.mpeg4,*.3gp,*.webm,*.vob
