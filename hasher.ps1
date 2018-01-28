@@ -302,37 +302,31 @@ Function Hash-Directory(
 	$Jobs += New-Object PSObject -Property @{
 		RunID = "JobDuplicates"
 		Pipe = $JobDuplicates
-		Result = $JobDuplicates.BeginInvoke()
+		Handle = $JobDuplicates.BeginInvoke()
     }
 	$Jobs += New-Object PSObject -Property @{
 		RunID = "JobUniques"
 		Pipe = $JobUniques
-		Result = $JobUniques.BeginInvoke()
+		Handle = $JobUniques.BeginInvoke()
 	}
 	
 	<# Wait loop #>
 	Write-Host -NoNewLine "`n";
-	$sT = Get-Date;
+	$Timer = [System.Diagnostics.Stopwatch]::StartNew()
 	do {
 		Start-Sleep -Seconds 1;
-		$RunningJobs = 0;
-		If ($Jobs[0].Result.IsCompleted -Contains $false) { $RunningJobs++; }
-		If ($Jobs[1].Result.IsCompleted -Contains $false) { $RunningJobs++; }
-		
-		$cT = Get-Date;
-		$eHT = [system.Math]::Abs(([int]$cT.Hour-[int]$sT.Hour));
-		$eMT = [system.Math]::Abs(([int]$cT.Minute-[int]$sT.Minute));
-		$eST = [system.Math]::Abs(([int]$cT.Second-[int]$sT.Second));
-		
+		$RunningJobs = (@($Jobs | Where { $_.Handle.IsCompleted -Ne 'Completed'}).Count);
+		$cT = $Timer.Elapsed;
 		Write-Host -NoNewLine $("`r`t`t{0} Jobs running" -f $RunningJobs.ToString()) -ForegroundColor Cyan;
 		Write-Host -NoNewLine " `| " -ForegroundColor White;
-		Write-Host -NoNewLine $("Elapsed: {0}h:{1}m:{2}s          " -f $eHT.ToString("0"),$eMT.ToString("00"),$eST.ToString("00")) -ForegroundColor Blue;
-	} While ( $Jobs.Result.IsCompleted -Contains $false)
+		Write-Host -NoNewLine $("Elapsed: {0:d1}h:{1:d2}m:{2:d2}s          " -f $cT.Hours,$cT.Minutes,$cT.Seconds) -ForegroundColor Blue;
+	} While ( $Jobs.Handle.IsCompleted -Contains $false)
    
 	<# Store Results #>
 	$Results = @()
 	ForEach ($Job in $Jobs) {
-		$Results += $Job.Pipe.EndInvoke($Job.Result)
+		$Results += $Job.Pipe.EndInvoke($Job.Handle);
+		$Job.Pipe.Dispose();
 	}
 	ForEach ($Result in $Results) {
 		If ($Result.RunIdent -Eq "JobDuplicates") {
